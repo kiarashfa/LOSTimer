@@ -149,8 +149,8 @@
     // Play sysfail.mp3 three times, spaced so each clip can finish.
     // sysfail.mp3 is ~0.5s; 1.2s spacing gives a clear, dramatic cadence.
     playSample('sysfail');
-    setTimeout(() => playSample('sysfail'), 3200);
-    setTimeout(() => playSample('sysfail'), 6400);
+    failureSeqTimeouts.push(setTimeout(() => playSample('sysfail'), 3200));
+    failureSeqTimeouts.push(setTimeout(() => playSample('sysfail'), 6400));
   }
   // ─────────────────────────────────────────────────────────────────────
 
@@ -669,6 +669,13 @@
       failureStreamTimeouts.forEach(id => clearTimeout(id));
       failureStreamTimeouts = [];
     }
+    // Cancel any pending steps of the failure sequence (overlay, glitch,
+    // screen swaps) so they can't fire after the timer has been reset.
+    failureSeqTimeouts.forEach(id => clearTimeout(id));
+    failureSeqTimeouts = [];
+    document.getElementById('failure-overlay').classList.remove('active');
+    document.getElementById('monitor-screen').classList.remove('glitch');
+    setFailureLock(false);
     stopAlarm();
     isFailure = false;
     totalSeconds = secs !== undefined ? secs : totalSeconds;
@@ -692,8 +699,22 @@
   }
 
   // ── FAILURE SEQUENCE ──
+  // Pending timeouts of the failure sequence; cleared by resetTimer.
+  let failureSeqTimeouts = [];
+  // True from the moment the timer expires until the failure-end text has
+  // fully streamed. While locked, only `reset --force` can restart the timer.
+  let failureLocked = false;
+  const FAILURE_END_AT = 11000;
+
+  function setFailureLock(on) {
+    failureLocked = on;
+    document.getElementById('btn-settings').classList.toggle('locked', on);
+  }
+
   function triggerFailure() {
     isFailure = true;
+    setFailureLock(true);
+    closeSettings();
     stopAlarm();
     const clock = document.getElementById('flip-clock');
     clock.classList.remove('timer-alarm');
@@ -707,15 +728,17 @@
     // Overlay + glitch + screen swap happen on a fixed timeline alongside the shuffle.
     const overlay = document.getElementById('failure-overlay');
     // Short delay before overlay so the shuffle is underway and dramatic.
-    setTimeout(() => { overlay.classList.add('active'); }, 2500);
-    setTimeout(() => { document.getElementById('monitor-screen').classList.add('glitch'); }, 3000);
+    failureSeqTimeouts.push(setTimeout(() => { overlay.classList.add('active'); }, 2500));
+    failureSeqTimeouts.push(setTimeout(() => { document.getElementById('monitor-screen').classList.add('glitch'); }, 3000));
     playFailure();
-    setTimeout(() => { setScreen('failure'); }, 4000);
-    setTimeout(() => {
+    failureSeqTimeouts.push(setTimeout(() => { setScreen('failure'); }, 4000));
+    failureSeqTimeouts.push(setTimeout(() => {
       overlay.classList.remove('active');
       document.getElementById('monitor-screen').classList.remove('glitch');
       setScreen('failure-end');
-    }, 11000);
+    }, FAILURE_END_AT));
+    const streamDuration = FAILURE_END_LINES.reduce((sum, [delay]) => sum + delay, 0);
+    failureSeqTimeouts.push(setTimeout(() => setFailureLock(false), FAILURE_END_AT + streamDuration));
   }
 
   // ── SCREEN CONTENT ──
@@ -1326,10 +1349,32 @@
       return;
     }
 
+    // "reset --force" — the only way to restart while the failure sequence
+    // is still playing. Rejected at any other time.
+    if (/^(reset|restart)\s+(--force|-f)$/.test(lower)) {
+      input.value = '';
+      if (!failureLocked) {
+        playSample('wrong');
+        printResponse('<span class="text-red">&gt;: RESET DENIED. FOLLOW THE INSTRUCTIONS.</span>');
+        return;
+      }
+      invalidAttempts = 0;
+      playSample('reset');
+      resetTimer(totalSeconds);
+      setScreen('home');
+      printResponse('<span class="text-amber">&gt;: FORCED RESTART. NAMASTE.</span>');
+      return;
+    }
+
     // "reset" command — restart the system using the last-set duration.
-    // Only meaningful after failure, but harmless any other time.
+    // Only accepted after the failure sequence has finished.
     if (lower === 'reset' || lower === 'restart') {
       input.value = '';
+      if (failureLocked) {
+        playSample('wrong');
+        printResponse('<span class="text-red">&gt;: RESET LOCKED. FAILURE SEQUENCE IN PROGRESS.</span>');
+        return;
+      }
       if (!isFailure) {
         playSample('wrong');
         printResponse('<span class="text-red">&gt;: RESET DENIED. FOLLOW THE INSTRUCTIONS.</span>');
@@ -1361,6 +1406,11 @@
       // Entering early is rejected with a protocol warning (and does NOT
       // count as an "invalid command" attempt — it's the right code, wrong
       // time).
+      if (failureLocked) {
+        playSample('wrong');
+        printResponse('<span class="text-red">&gt;: RESET LOCKED. FAILURE SEQUENCE IN PROGRESS.</span>');
+        return;
+      }
       if (remaining > WARN_AT && !isFailure) {
         playSample('wrong');
         printResponse('<span class="text-red">&gt;: PROCESSOR DISABLED UNTIL THE LAST 4 MIN.</span>');
@@ -1481,6 +1531,7 @@
 
   // ── SETTINGS ──
   function openSettings() {
+    if (failureLocked) { playSample('wrong'); return; }
     playSample('gear');
     const m = document.getElementById('settings-modal');
     document.getElementById('settings-minutes').value = Math.round(totalSeconds/60);
@@ -1491,8 +1542,12 @@
   function applySettings() {
     const v = parseInt(document.getElementById('settings-minutes').value);
     if (isNaN(v)||v<1||v>999) return;
+    if (failureLocked) { closeSettings(); return; }
     closeSettings();
+    const wasFailure = isFailure;
     resetTimer(v*60);
+    // Leave the "TIMER EXPIRED" screen, same as the reset command does.
+    if (wasFailure) { invalidAttempts = 0; setScreen('home'); }
     printResponse(`<span class="text-amber">&gt;: TIMER SET TO ${v} MINUTES.</span>`);
   }
 

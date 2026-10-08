@@ -681,6 +681,7 @@ button, input { font-family: inherit; }
   font-family: var(--font-mono);
 }
 .btn-icon:hover { border-color: rgba(160,160,160,0.5); color: rgba(200,200,200,0.8); background: rgba(255,255,255,0.04); }
+.btn-icon.locked, .btn-icon.locked:hover { opacity: 0.35; cursor: not-allowed; background: none; }
 
 /* Mute button — when muted, glyph and border turn red. */
 #btn-mute.muted { color: var(--red-alarm); border-color: rgba(160,40,40,0.5); }
