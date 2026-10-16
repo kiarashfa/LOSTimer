@@ -7,4 +7,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://kiarashfa.github.io/LOSTimer/sitemap.xml
+Sitemap: https://kiarashfa.github.io/LOSTimer/sitemap-index.xml
