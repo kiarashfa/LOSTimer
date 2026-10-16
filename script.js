@@ -857,7 +857,7 @@
 <span class="screen-line"><span class="text-dim">·</span> LOST (2004–2010). J.J. Abrams & Damon Lindelof</span>
 <span class="screen-line"><span class="text-dim">·</span> The DHARMA Initiative (for the clip & octagons)</span>
 <span class="screen-line"><span class="text-dim">·</span> <a href="https://lostpedia.fandom.com/" target="_blank" rel="noopener">Lostpedia</a> (for reference material)</span>
-<span class="screen-line"><span class="text-dim">·</span> Mark Snow's score (had on loop while building this)</span>
+<span class="screen-line"><span class="text-dim">·</span> Michael Giacchino's score (had on loop while building this)</span>
 <span class="screen-line">&nbsp;</span>
 <span class="screen-line text-amber">// SUPPORT THE PROJECT //</span>
 <span class="screen-line">&nbsp;</span>
